@@ -62,7 +62,7 @@ export default Ember.Mixin.create({
     @private
   */
   beforeModel: function(transition) {
-    this._super(transition);
+    var superResult = this._super(transition);
     if (!this.get('_authEventListenersAssigned')) {
       this.set('_authEventListenersAssigned', true);
       var _this = this;
@@ -79,6 +79,7 @@ export default Ember.Mixin.create({
         });
       });
     }
+    return superResult;
   },
 
   actions: {
