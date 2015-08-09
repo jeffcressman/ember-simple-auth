@@ -1,5 +1,4 @@
 import Base from 'simple-auth/authorizers/base';
-import isSecureUrl from 'simple-auth/utils/is-secure-url';
 
 /**
   Authorizer that conforms to OAuth 2
@@ -12,7 +11,7 @@ import isSecureUrl from 'simple-auth/utils/is-secure-url';
 
   @class OAuth2
   @namespace SimpleAuth.Authorizers
-  @module simple-auth-devise/authorizers/oauth2
+  @module simple-auth-oauth2/authorizers/oauth2
   @extends Base
 */
 export default Base.extend({
@@ -29,11 +28,8 @@ export default Base.extend({
     @param {Object} requestOptions The options as provided to the `$.ajax` method (see http://api.jquery.com/jQuery.ajaxPrefilter/)
   */
   authorize: function(jqXHR, requestOptions) {
-    var accessToken = this.get('session.access_token');
+    var accessToken = this.get('session.secure.access_token');
     if (this.get('session.isAuthenticated') && !Ember.isEmpty(accessToken)) {
-      if (!isSecureUrl(requestOptions.url)) {
-        Ember.Logger.warn('Credentials are transmitted via an insecure connection - use HTTPS to keep them secure.');
-      }
       jqXHR.setRequestHeader('Authorization', 'Bearer ' + accessToken);
     }
   }

@@ -29,6 +29,7 @@
   <script src="../tmp/ember-simple-auth-testing-tests.amd.js"></script>
   <script type="text/javascript">
     Ember.Logger.warn = Ember.K;
+    Ember.onerror     = Ember.K;
     for (var key in requireModule.registry) {
       if (/-test$/.test(key)) {
         requireModule(key);
@@ -39,7 +40,7 @@
     chai.Assertion.includeStack = true;
 
     mocha.checkLeaks();
-    mocha.globals(['jQuery', 'Ember', 'Handlebars', 'ENV']);
+    mocha.globals(['jQuery*', 'Ember', 'Handlebars', 'ENV']);
     if (navigator.userAgent.indexOf('PhantomJS') < 0) {
       mocha.run();
     }

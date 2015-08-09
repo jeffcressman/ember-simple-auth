@@ -105,7 +105,7 @@ module.exports = function(request, response, next) {
   } else if (request.url === '/v5/users/sign_in') {
     if (request.method === 'POST') {
       if (request.body.user.email === 'letme' && request.body.user.password === 'in') {
-        success('{ "user_email": "letme", "user_token": "secret token!" }');
+        success('{ "email": "letme", "token": "secret token!" }');
       } else {
         error(422, '');
       }
@@ -113,7 +113,7 @@ module.exports = function(request, response, next) {
       next();
     }
   } else if (request.url === '/v5/data') {
-    if (request.headers.authorization === 'Token token="secret token!", user_email="letme"') {
+    if (request.headers.authorization === 'Token token="secret token!", email="letme"') {
       success('{ "some": "data" }');
     } else {
       error(401, '{}');

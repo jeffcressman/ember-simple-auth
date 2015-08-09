@@ -1,10 +1,10 @@
 import Base from 'simple-auth/authorizers/base';
-import isSecureUrl from 'simple-auth/utils/is-secure-url';
+import Configuration from './../configuration';
 
 /**
-  Authenticator that works with the Ruby gem
-  [Devise](https://github.com/plataformatec/devise) by sending the `user_token`
-  and `user_email` properties from the session in the `Authorization` header.
+  Authorizer that works with the Ruby gem
+  [Devise](https://github.com/plataformatec/devise) by sending the `token` and
+  `email` properties from the session in the `Authorization` header.
 
   __As token authentication is not actually part of devise anymore, the server
   needs to implement some customizations__ to work with this authenticator -
@@ -20,11 +20,35 @@ import isSecureUrl from 'simple-auth/utils/is-secure-url';
 */
 export default Base.extend({
   /**
-    Authorizes an XHR request by sending the `user_token` and `user_email`
+    The token attribute name.
+
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#tokenAttributeName`](#SimpleAuth-Configuration-Devise-tokenAttributeName).
+
+    @property tokenAttributeName
+    @type String
+    @default 'token'
+  */
+  tokenAttributeName: 'token',
+
+  /**
+    The identification attribute name.
+
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#identificationAttributeName`](#SimpleAuth-Configuration-Devise-identificationAttributeName).
+
+    @property identificationAttributeName
+    @type String
+    @default 'email'
+  */
+  identificationAttributeName: 'email',
+
+  /**
+    Authorizes an XHR request by sending the `token` and `email`
     properties from the session in the `Authorization` header:
 
     ```
-    Authorization: Token token="<user_token>", user_email="<user_email>"
+    Authorization: Token <tokenAttributeName>="<token>", <identificationAttributeName>="<user identification>"
     ```
 
     @method authorize
@@ -32,14 +56,21 @@ export default Base.extend({
     @param {Object} requestOptions The options as provided to the `$.ajax` method (see http://api.jquery.com/jQuery.ajaxPrefilter/)
   */
 
+  /**
+    @method init
+    @private
+  */
+  init: function() {
+    this.tokenAttributeName          = Configuration.tokenAttributeName;
+    this.identificationAttributeName = Configuration.identificationAttributeName;
+  },
+
   authorize: function(jqXHR, requestOptions) {
-    var userToken = this.get('session.user_token');
-    var userEmail = this.get('session.user_email');
-    if (this.get('session.isAuthenticated') && !Ember.isEmpty(userToken) && !Ember.isEmpty(userEmail)) {
-      if (!isSecureUrl(requestOptions.url)) {
-        Ember.Logger.warn('Credentials are transmitted via an insecure connection - use HTTPS to keep them secure.');
-      }
-      var authData = 'token="' + userToken + '", user_email="' + userEmail + '"';
+    var secureData         = this.get('session.secure');
+    var userToken          = secureData[this.tokenAttributeName];
+    var userIdentification = secureData[this.identificationAttributeName];
+    if (this.get('session.isAuthenticated') && !Ember.isEmpty(userToken) && !Ember.isEmpty(userIdentification)) {
+      var authData = this.tokenAttributeName + '="' + userToken + '", ' + this.identificationAttributeName + '="' + userIdentification + '"';
       jqXHR.setRequestHeader('Authorization', 'Token ' + authData);
     }
   }

@@ -20,7 +20,7 @@
   __Custom authenticators have to be registered with Ember's dependency
   injection container__ so that the session can retrieve an instance, e.g.:
 
-  ```javascript
+  ```js
   import Base from 'simple-auth/authenticators/base';
 
   var CustomAuthenticator = Base.extend({
@@ -30,17 +30,19 @@
   Ember.Application.initializer({
     name: 'authentication',
     initialize: function(container, application) {
-      container.register('authenticator:custom', CustomAuthenticator);
+      application.register('authenticator:custom', CustomAuthenticator);
     }
   });
   ```
 
-  ```javascript
+  ```js
   // app/controllers/login.js
-  import AuthenticationControllerMixin from 'simple-auth/mixins/authentication-controller-mixin';
-
-  export default Ember.Controller.extend(AuthenticationControllerMixin, {
-    authenticator: 'authenticator:custom'
+  export default Ember.Controller.extend({
+    actions: {
+      authenticate: function() {
+        this.get('session').authenticate('authenticator:custom');
+      }
+    }
   });
   ```
 
@@ -54,9 +56,9 @@ export default Ember.Object.extend(Ember.Evented, {
   /**
     __Triggered when the data that constitutes the session is updated by the
     authenticator__. This might happen e.g. because the authenticator refreshes
-    it or an event from is triggered from an external authentication provider.
-    The session automatically catches that event, passes the updated data back
-    to the authenticator's
+    it or an event is triggered from an external authentication provider. The
+    session automatically catches that event, passes the updated data back to
+    the authenticator's
     [SimpleAuth.Authenticators.Base#restore](#SimpleAuth-Authenticators-Base-restore)
     method and handles the result of that invocation accordingly.
 
@@ -70,22 +72,21 @@ export default Ember.Object.extend(Ember.Evented, {
     automatically catches that event and invalidates itself.
 
     @event sessionDataInvalidated
-    @param {Object} data The updated session data
   */
 
   /**
     Restores the session from a set of properties. __This method is invoked by
     the session either after the application starts up and session data was
     restored from the store__ or when properties in the store have changed due
-    to external events (e.g. in another tab) and the new set of properties
-    needs to be re-checked for whether it still constitutes an authenticated
-    session.
+    to external events (e.g. in another tab) and the new session data needs to
+    be re-checked for whether it still constitutes an authenticated session.
 
     __This method returns a promise. A resolving promise will result in the
-    session being authenticated.__ Any properties the promise resolves with
-    will be saved in and accessible via the session. In most cases the `data`
-    argument will simply be forwarded through the promise. A rejecting promise
-    indicates that authentication failed and the session will remain unchanged.
+    session being authenticated.__ Any data the promise resolves with will be
+    saved in and accessible via the session's `secure` property. In most cases,
+    `data` will simply be forwarded through the promise. A rejecting promise
+    indicates that `data` does not constitute a valid session and will result
+    in the session being invalidated.
 
     `SimpleAuth.Authenticators.Base`'s implementation always returns a
     rejecting promise.
@@ -95,31 +96,31 @@ export default Ember.Object.extend(Ember.Evented, {
     @return {Ember.RSVP.Promise} A promise that when it resolves results in the session being authenticated
   */
   restore: function(data) {
-    return new Ember.RSVP.reject();
+    return Ember.RSVP.reject();
   },
 
   /**
     Authenticates the session with the specified `options`. These options vary
     depending on the actual authentication mechanism the authenticator
     implements (e.g. a set of credentials or a Facebook account id etc.). __The
-    session will invoke this method when an action in the appliaction triggers
-    authentication__ (see
-    [SimpleAuth.AuthenticationControllerMixin.actions#authenticate](#SimpleAuth-AuthenticationControllerMixin-authenticate)).
+    session will invoke this method when it is being authenticated__ (see
+    [SimpleAuth.Session#authenticate](#SimpleAuth-Session-authenticate)).
 
     __This method returns a promise. A resolving promise will result in the
     session being authenticated.__ Any properties the promise resolves with
-    will be saved in and accessible via the session. A rejecting promise
-    indicates that authentication failed and the session will remain unchanged.
+    will be saved in and accessible via the session's `secure` property. A
+    rejecting promise indicates that authentication failed and the session will
+    remain unchanged.
 
     `SimpleAuth.Authenticators.Base`'s implementation always returns a
     rejecting promise and thus never authenticates the session.
 
     @method authenticate
-    @param {Object} options The options to authenticate the session with
+    @param {Any} [...options] The arguments that the authenticator requires to authenticate the session
     @return {Ember.RSVP.Promise} A promise that when it resolves results in the session being authenticated
   */
   authenticate: function(options) {
-    return new Ember.RSVP.reject();
+    return Ember.RSVP.reject();
   },
 
   /**
@@ -141,6 +142,6 @@ export default Ember.Object.extend(Ember.Evented, {
     @return {Ember.RSVP.Promise} A promise that when it resolves results in the session being invalidated
   */
   invalidate: function(data) {
-    return new Ember.RSVP.resolve();
+    return Ember.RSVP.resolve();
   }
 });

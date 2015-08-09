@@ -7,7 +7,7 @@ import Configuration from './../configuration';
   [`Configuration.authenticationRoute`](#SimpleAuth-Configuration-authenticationRoute)
   if it is not.
 
-  ```javascript
+  ```js
   // app/routes/protected.js
   import AuthenticatedRouteMixin from 'simple-auth/mixins/authenticated-route-mixin';
 
@@ -40,12 +40,15 @@ export default Ember.Mixin.create({
     @param {Transition} transition The transition that lead to this route
   */
   beforeModel: function(transition) {
-    this._super(transition);
+    var superResult = this._super(transition);
+
     if (!this.get(Configuration.sessionPropertyName).get('isAuthenticated')) {
       transition.abort();
       this.get(Configuration.sessionPropertyName).set('attemptedTransition', transition);
-      Ember.assert('The route configured as Configuration.authenticationRoute cannot implement the AuthenticatedRouteMixin mixin as that leads to an infinite transitioning loop.', this.get('routeName') !== Configuration.authenticationRoute);
-      transition.send('authenticateSession');
+      Ember.assert('The route configured as Configuration.authenticationRoute cannot implement the AuthenticatedRouteMixin mixin as that leads to an infinite transitioning loop!', this.get('routeName') !== Configuration.authenticationRoute);
+      transition.send('sessionRequiresAuthentication');
     }
+
+    return superResult;
   }
 });

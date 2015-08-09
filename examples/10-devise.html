@@ -4,8 +4,8 @@
     <title>Ember Simple Auth - examples</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
-    <script src="http://code.jquery.com/jquery-1.9.1.js"></script>
-    <script src="http://cdnjs.cloudflare.com/ajax/libs/handlebars.js/1.0.0/handlebars.js"></script>
+    <script src="http://code.jquery.com/jquery-2.1.3.js"></script>
+    <script src="http://builds.emberjs.com/release/ember-template-compiler.js"></script>
     <script src="http://builds.emberjs.com/release/ember.js"></script>
     <script src="../tmp/ember-simple-auth.js"></script>
     <script src="../tmp/ember-simple-auth-devise.js"></script>
@@ -105,9 +105,20 @@
       });
 
       // use the provided mixins in the application route and login controller
-      App.ApplicationRoute = Ember.Route.extend(SimpleAuth.ApplicationRouteMixin);
-      App.LoginController  = Ember.Controller.extend(SimpleAuth.LoginControllerMixin, {
-        authenticator: 'simple-auth-authenticator:devise'
+      App.ApplicationRoute = Ember.Route.extend(SimpleAuth.ApplicationRouteMixin, {
+        actions: {
+          invalidateSession: function() {
+            this.get('session').invalidate();
+          }
+        }
+      });
+      App.LoginController = Ember.Controller.extend({
+        actions: {
+          authenticate: function() {
+            var credentials = this.getProperties('identification', 'password');
+            this.get('session').authenticate('simple-auth-authenticator:devise', credentials);
+          }
+        }
       });
 
       // make this route protected

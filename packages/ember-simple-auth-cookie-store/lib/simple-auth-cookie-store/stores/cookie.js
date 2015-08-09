@@ -1,6 +1,6 @@
 import Base from 'simple-auth/stores/base';
-import flatObjectsAreEqual from 'simple-auth/utils/flat-objects-are-equal';
-import getGlobalConfig from 'simple-auth/utils/get-global-config';
+import objectsAreEqual from 'simple-auth/utils/objects-are-equal';
+import Configuration from './../configuration';
 
 /**
   Store that saves its data in a cookie.
@@ -22,9 +22,7 @@ import getGlobalConfig from 'simple-auth/utils/get-global-config';
 
   ```js
   // app/controllers/login.js
-  import LoginControllerMixin from 'simple-auth/mixins/login-controller-mixin';
-
-  export default Ember.Controller.extend(LoginControllerMixin, {
+  export default Ember.Controller.extend({
     rememberMe: false,
 
     rememberMeChanged: function() {
@@ -42,21 +40,30 @@ import getGlobalConfig from 'simple-auth/utils/get-global-config';
   @extends Stores.Base
 */
 export default Base.extend({
+
+  /**
+    The domain to use for the cookie, e.g., "example.com", ".example.com"
+    (includes all subdomains) or "subdomain.example.com". If not configured the
+    cookie domain defaults to the domain the session was authneticated on.
+
+    This value can be configured via
+    [`SimpleAuth.Configuration.CookieStore#cookieDomain`](#SimpleAuth-Configuration-CookieStore-cookieDomain).
+
+    @property cookieDomain
+    @type String
+    @default null
+  */
+  cookieDomain: null,
+
   /**
     The name of the cookie the store stores its data in.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-cookie-store'] = {
-      cookieName: 'my_app_auth_session'
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.CookieStore#cookieName`](#SimpleAuth-Configuration-CookieStore-cookieName).
 
     @property cookieName
+    @readOnly
     @type String
-    @default 'ember_simple_auth:'
   */
   cookieName: 'ember_simple_auth:session',
 
@@ -65,18 +72,12 @@ export default Base.extend({
     will make the cookie a session cookie that expires when the browser is
     closed.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-cookie-store'] = {
-      cookieExpirationTime: 24 * 60 * 60
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.CookieStore#cookieExpirationTime`](#SimpleAuth-Configuration-CookieStore-cookieExpirationTime).
 
     @property cookieExpirationTime
+    @readOnly
     @type Integer
-    @default null
   */
   cookieExpirationTime: null,
 
@@ -93,14 +94,28 @@ export default Base.extend({
   _syncDataTimeout: null,
 
   /**
+    @property renewExpirationTimeout
+    @private
+  */
+  renewExpirationTimeout: null,
+
+  /**
+    @property isPageVisible
+    @private
+  */
+  isPageVisible: null,
+
+  /**
     @method init
     @private
   */
   init: function() {
-    var globalConfig          = getGlobalConfig('simple-auth-cookie-store');
-    this.cookieName           = globalConfig.cookieName || this.cookieName;
-    this.cookieExpirationTime = globalConfig.cookieExpirationTime || this.cookieExpirationTime;
+    this.cookieName           = Configuration.cookieName;
+    this.cookieExpirationTime = Configuration.cookieExpirationTime;
+    this.cookieDomain         = Configuration.cookieDomain;
+    this.isPageVisible        = this.initPageVisibility();
     this.syncData();
+    this.renewExpiration();
   },
 
   /**
@@ -111,7 +126,7 @@ export default Base.extend({
   */
   persist: function(data) {
     data           = JSON.stringify(data || {});
-    var expiration = !!this.cookieExpirationTime ? new Date().getTime() + this.cookieExpirationTime * 1000 : null;
+    var expiration = this.calculateExpirationTime();
     this.write(data, expiration);
     this._lastData = this.restore();
   },
@@ -123,7 +138,7 @@ export default Base.extend({
     @return {Object} All data currently persisted in the cookie
   */
   restore: function() {
-    var data = this.read();
+    var data = this.read(this.cookieName);
     if (Ember.isEmpty(data)) {
       return {};
     } else {
@@ -140,16 +155,26 @@ export default Base.extend({
   */
   clear: function() {
     this.write(null, 0);
-    this._lastData = null;
+    this._lastData = {};
   },
 
   /**
     @method read
     @private
   */
-  read: function() {
-    var value = document.cookie.match(new RegExp(this.cookieName + name + '=([^;]+)')) || [];
+  read: function(name) {
+    var value = document.cookie.match(new RegExp(name + '=([^;]+)')) || [];
     return decodeURIComponent(value[1] || '');
+  },
+
+  /**
+    @method calculateExpirationTime
+    @private
+  */
+  calculateExpirationTime: function() {
+    var cachedExpirationTime = this.read(this.cookieName + ':expiration_time');
+    cachedExpirationTime     = !!cachedExpirationTime ? new Date().getTime() + cachedExpirationTime * 1000 : null;
+    return !!this.cookieExpirationTime ? new Date().getTime() + this.cookieExpirationTime * 1000 : cachedExpirationTime;
   },
 
   /**
@@ -157,10 +182,15 @@ export default Base.extend({
     @private
   */
   write: function(value, expiration) {
-    var path = '; path=/';
-    var expires = Ember.isEmpty(expiration) ? '' : '; expires=' + new Date(expiration).toUTCString();
-    var secure  = !!this._secureCookies ? ';secure' : '';
-    document.cookie = this.cookieName + '=' + encodeURIComponent(value) + path + expires + secure;
+    var path        = '; path=/';
+    var domain      = Ember.isEmpty(this.cookieDomain) ? '' : '; domain=' + this.cookieDomain;
+    var expires     = Ember.isEmpty(expiration) ? '' : '; expires=' + new Date(expiration).toUTCString();
+    var secure      = !!this._secureCookies ? ';secure' : '';
+    document.cookie = this.cookieName + '=' + encodeURIComponent(value) + domain + path + expires + secure;
+    if(expiration !== null) {
+      var cachedExpirationTime = this.read(this.cookieName + ':expiration_time');
+      document.cookie = this.cookieName + ':expiration_time=' + encodeURIComponent(this.cookieExpirationTime || cachedExpirationTime) + domain + path + expires + secure;
+    }
   },
 
   /**
@@ -169,13 +199,62 @@ export default Base.extend({
   */
   syncData: function() {
     var data = this.restore();
-    if (!flatObjectsAreEqual(data, this._lastData)) {
+    if (!objectsAreEqual(data, this._lastData)) {
       this._lastData = data;
       this.trigger('sessionDataUpdated', data);
     }
     if (!Ember.testing) {
       Ember.run.cancel(this._syncDataTimeout);
       this._syncDataTimeout = Ember.run.later(this, this.syncData, 500);
+    }
+  },
+
+  /**
+    @method initPageVisibility
+    @private
+  */
+  initPageVisibility: function(){
+    var keys = {
+      hidden:       'visibilitychange',
+      webkitHidden: 'webkitvisibilitychange',
+      mozHidden:    'mozvisibilitychange',
+      msHidden:     'msvisibilitychange'
+    };
+    for (var stateKey in keys) {
+      if (stateKey in document) {
+        var eventKey = keys[stateKey];
+        break;
+      }
+    }
+    return function() {
+      return !document[stateKey];
+    };
+  },
+
+  /**
+    @method renew
+    @private
+  */
+  renew: function() {
+    var data = this.restore();
+    if (!Ember.isEmpty(data) && data !== {}) {
+      data           = Ember.typeOf(data) === 'string' ? data : JSON.stringify(data || {});
+      var expiration = this.calculateExpirationTime();
+      this.write(data, expiration);
+    }
+  },
+
+  /**
+    @method renewExpiration
+    @private
+  */
+  renewExpiration: function() {
+    if (this.isPageVisible()) {
+      this.renew();
+    }
+    if (!Ember.testing) {
+      Ember.run.cancel(this.renewExpirationTimeout);
+      this.renewExpirationTimeout = Ember.run.later(this, this.renewExpiration, 60000);
     }
   }
 });

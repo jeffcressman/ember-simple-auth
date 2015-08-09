@@ -9,13 +9,13 @@ server responses etc.
 To authenticate the session, use the `authenticateSession` helper, e.g.:
 
 ```js
-test('a protected route is accessible when the session is authenticated', function() {
-  expect(1);
+test('a protected route is accessible when the session is authenticated', function(assert) {
+  assert.expect(1);
   authenticateSession();
   visit('/protected');
 
   andThen(function() {
-    equal(currentRouteName(), 'protected');
+    assert.equal(currentRouteName(), 'protected');
   });
 });
 ```
@@ -23,15 +23,44 @@ test('a protected route is accessible when the session is authenticated', functi
 and to invalidate the session, use the `invaldiateSession` helper, e.g.:
 
 ```js
-test('a protected route is not accessible when the session is not authenticated', function() {
-  expect(1);
+test('a protected route is not accessible when the session is not authenticated', function(assert) {
+  assert.expect(1);
   invalidateSession();
   visit('/protected');
 
   andThen(function() {
-    notEqual(currentRouteName(), 'protected');
+    assert.notEqual(currentRouteName(), 'protected');
   });
 });
+```
+
+This package also defines the `currentSession` helper that provides access to
+the session from tests to e.g. set properties on it:
+
+```js
+test("the current project's name is displayed in the page header", function(assert) {
+  assert.expect(1);
+  authenticateSession();
+  currentSession().set('currentProject', 'some test project');
+  visit('/dashboard');
+
+  andThen(function() {
+    assert.findWithAssert('h1:contains("some test project")');
+  });
+});
+```
+
+## Configuration
+
+When using the testing helpers also make sure to use the ephemeral session
+store for the `test` environment as otherwise the session will be persisted and
+tests might influence each other.
+
+```js
+//config/environment.js
+if (environment === 'test') {
+  ENV['simple-auth'].store = 'simple-auth-session-store:ephemeral';
+}
 ```
 
 ## Installation
@@ -47,7 +76,8 @@ several options:
 
   ```js
   …
-  import 'simple-auth-testing/test-helpers';
+  import initializeTestHelpers from 'simple-auth-testing/test-helpers';
+  initializeTestHelpers();
 
   export default function startApp(attrs) {
   …

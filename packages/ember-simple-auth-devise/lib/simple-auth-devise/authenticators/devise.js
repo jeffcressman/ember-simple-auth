@@ -1,6 +1,5 @@
 import Base from 'simple-auth/authenticators/base';
-import isSecureUrl from 'simple-auth/utils/is-secure-url';
-import getGlobalConfig from 'simple-auth/utils/get-global-config';
+import Configuration from './../configuration';
 
 /**
   Authenticator that works with the Ruby gem
@@ -24,14 +23,8 @@ export default Base.extend({
     The endpoint on the server the authenticator acquires the auth token
     and email from.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-devise'] = {
-      serverTokenEndpoint: '/some/other/endpoint'
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#serverTokenEndpoint`](#SimpleAuth-Configuration-Devise-serverTokenEndpoint).
 
     @property serverTokenEndpoint
     @type String
@@ -42,14 +35,8 @@ export default Base.extend({
   /**
     The devise resource name
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-devise'] = {
-      resourceName: 'account'
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#resourceName`](#SimpleAuth-Configuration-Devise-resourceName).
 
     @property resourceName
     @type String
@@ -58,27 +45,54 @@ export default Base.extend({
   resourceName: 'user',
 
   /**
+    The token attribute name.
+
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#tokenAttributeName`](#SimpleAuth-Configuration-Devise-tokenAttributeName).
+
+    @property tokenAttributeName
+    @type String
+    @default 'token'
+  */
+  tokenAttributeName: 'token',
+
+  /**
+    The identification attribute name.
+
+    This value can be configured via
+    [`SimpleAuth.Configuration.Devise#identificationAttributeName`](#SimpleAuth-Configuration-Devise-identificationAttributeName).
+
+    @property identificationAttributeName
+    @type String
+    @default 'email'
+  */
+  identificationAttributeName: 'email',
+
+  /**
     @method init
     @private
   */
   init: function() {
-    var globalConfig         = getGlobalConfig('simple-auth-devise');
-    this.serverTokenEndpoint = globalConfig.serverTokenEndpoint || this.serverTokenEndpoint;
-    this.resourceName        = globalConfig.resourceName || this.resourceName;
+    this.serverTokenEndpoint          = Configuration.serverTokenEndpoint;
+    this.resourceName                 = Configuration.resourceName;
+    this.tokenAttributeName           = Configuration.tokenAttributeName;
+    this.identificationAttributeName  = Configuration.identificationAttributeName;
   },
 
   /**
     Restores the session from a set of session properties; __will return a
-    resolving promise when there's a non-empty `user_token` and a non-empty
-    `user_email` in the `properties`__ and a rejecting promise otherwise.
+    resolving promise when there's a non-empty `token` and a non-empty
+    `email` in the `properties`__ and a rejecting promise otherwise.
 
     @method restore
     @param {Object} properties The properties to restore the session from
     @return {Ember.RSVP.Promise} A promise that when it resolves results in the session being authenticated
   */
   restore: function(properties) {
+    var _this            = this;
+    var propertiesObject = Ember.Object.create(properties);
     return new Ember.RSVP.Promise(function(resolve, reject) {
-      if (!Ember.isEmpty(properties.user_token) && !Ember.isEmpty(properties.user_email)) {
+      if (!Ember.isEmpty(propertiesObject.get(_this.tokenAttributeName)) && !Ember.isEmpty(propertiesObject.get(_this.identificationAttributeName))) {
         resolve(properties);
       } else {
         reject();
@@ -104,9 +118,10 @@ export default Base.extend({
     return new Ember.RSVP.Promise(function(resolve, reject) {
       var data                 = {};
       data[_this.resourceName] = {
-        email:    credentials.identification,
         password: credentials.password
       };
+      data[_this.resourceName][_this.identificationAttributeName] = credentials.identification;
+
       _this.makeRequest(data).then(function(response) {
         Ember.run(function() {
           resolve(response);
@@ -134,9 +149,6 @@ export default Base.extend({
     @private
   */
   makeRequest: function(data, resolve, reject) {
-    if (!isSecureUrl(this.serverTokenEndpoint)) {
-      Ember.Logger.warn('Credentials are transmitted via an insecure connection - use HTTPS to keep them secure.');
-    }
     return Ember.$.ajax({
       url:        this.serverTokenEndpoint,
       type:       'POST',

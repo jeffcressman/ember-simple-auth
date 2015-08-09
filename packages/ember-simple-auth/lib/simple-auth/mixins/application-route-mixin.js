@@ -1,32 +1,11 @@
 import Configuration from './../configuration';
 
 /**
-  The mixin for the application route; defines actions to authenticate the
-  session as well as to invalidate it. These actions can be used in all
-  templates like this:
-
-  ```handlebars
-  {{#if session.isAuthenticated}}
-    <a {{ action 'invalidateSession' }}>Logout</a>
-  {{else}}
-    <a {{ action 'authenticateSession' }}>Login</a>
-  {{/if}}
-  ```
-
-  or in the case that the application uses a dedicated route for logging in:
-
-  ```handlebars
-  {{#if session.isAuthenticated}}
-    <a {{ action 'invalidateSession' }}>Logout</a>
-  {{else}}
-    {{#link-to 'login'}}Login{{/link-to}}
-  {{/if}}
-  ```
-
-  This mixin also defines actions that are triggered whenever the session is
-  successfully authenticated or invalidated and whenever authentication or
-  invalidation fails. These actions provide a good starting point for adding
-  custom behavior to these events.
+  The mixin for the application route; defines actions that are triggered
+  when authentication is required, when the session has successfully been
+  authenticated or invalidated or when authentication or invalidation fails or
+  authorization is rejected by the server. These actions provide a good
+  starting point for adding custom behavior to these events.
 
   __When this mixin is used and the application's `ApplicationRoute` defines
   the `beforeModel` method, that method has to call `_super`.__
@@ -35,7 +14,7 @@ import Configuration from './../configuration';
   be automatically translated into route actions but would have to be handled
   inidivially, e.g. in an initializer:
 
-  ```javascript
+  ```js
   Ember.Application.initializer({
     name:       'authentication',
     after:      'simple-auth',
@@ -58,6 +37,20 @@ import Configuration from './../configuration';
 */
 export default Ember.Mixin.create({
   /**
+    @method activate
+    @private
+  */
+  activate: function () {
+    /*
+      Used to detect the first time the application route is entered so that
+      the transition can be used as the target of send before entering the
+      application route and the route can be used once it has been entered.
+    */
+    this.set('_authRouteEntryComplete', true);
+    this._super();
+  },
+
+  /**
     @method beforeModel
     @private
   */
@@ -75,7 +68,8 @@ export default Ember.Mixin.create({
       ]).forEach(function(event) {
         _this.get(Configuration.sessionPropertyName).on(event, function(error) {
           Array.prototype.unshift.call(arguments, event);
-          transition.send.apply(transition, arguments);
+          var target = _this.get('_authRouteEntryComplete') ? _this : transition;
+          target.send.apply(target, arguments);
         });
       });
     }
@@ -84,7 +78,35 @@ export default Ember.Mixin.create({
 
   actions: {
     /**
-      This action triggers transition to the
+      This action triggers a transition to the
+      [`Configuration.authenticationRoute`](#SimpleAuth-Configuration-authenticationRoute).
+      It is triggered automatically by the
+      [`AuthenticatedRouteMixin`](#SimpleAuth-AuthenticatedRouteMixin) whenever
+      a route that requires authentication is accessed but the session is not
+      currently authenticated.
+
+      __For an application that works without an authentication route (e.g.
+      because it opens a new window to handle authentication there), this is
+      the action to override, e.g.:__
+
+      ```js
+      App.ApplicationRoute = Ember.Route.extend(SimpleAuth.ApplicationRouteMixin, {
+        actions: {
+          sessionRequiresAuthentication: function() {
+            this.get('session').authenticate('authenticator:custom', {});
+          }
+        }
+      });
+      ```
+
+      @method actions.sessionRequiresAuthentication
+    */
+    sessionRequiresAuthentication: function() {
+      this.transitionTo(Configuration.authenticationRoute);
+    },
+
+    /**
+      This action triggers a transition to the
       [`Configuration.authenticationRoute`](#SimpleAuth-Configuration-authenticationRoute).
       It can be used in templates as shown above. It is also triggered
       automatically by the
@@ -96,7 +118,7 @@ export default Ember.Mixin.create({
       because it opens a new window to handle authentication there), this is
       the action to override, e.g.:__
 
-      ```javascript
+      ```js
       App.ApplicationRoute = Ember.Route.extend(SimpleAuth.ApplicationRouteMixin, {
         actions: {
           authenticateSession: function() {
@@ -107,9 +129,11 @@ export default Ember.Mixin.create({
       ```
 
       @method actions.authenticateSession
+      @deprecated use [`ApplicationRouteMixin#sessionRequiresAuthentication`](#SimpleAuth-ApplicationRouteMixin-sessionRequiresAuthentication) instead
     */
     authenticateSession: function() {
-      this.transitionTo(Configuration.authenticationRoute);
+      Ember.deprecate('The authenticateSession action is deprecated. Use sessionRequiresAuthentication instead.');
+      this.send('sessionRequiresAuthentication');
     },
 
     /**
@@ -141,7 +165,7 @@ export default Ember.Mixin.create({
 
       It can be overridden to display error messages etc.:
 
-      ```javascript
+      ```js
       App.ApplicationRoute = Ember.Route.extend(SimpleAuth.ApplicationRouteMixin, {
         actions: {
           sessionAuthenticationFailed: function(error) {
@@ -164,8 +188,10 @@ export default Ember.Mixin.create({
       [`ApplicationRouteMixin#sessionInvalidationSucceeded`](#SimpleAuth-ApplicationRouteMixin-sessionInvalidationSucceeded)).
 
       @method actions.invalidateSession
+      @deprecated use [`Session#invalidate`](#SimpleAuth-Session-invalidate) instead
     */
     invalidateSession: function() {
+      Ember.deprecate("The invalidateSession action is deprecated. Use the session's invalidate method directly instead.");
       this.get(Configuration.sessionPropertyName).invalidate();
     },
 
@@ -177,10 +203,17 @@ export default Ember.Mixin.create({
       the Ember.js application's router (see
       http://emberjs.com/guides/routing/#toc_specifying-a-root-url).
 
+      If your Ember.js application will be used in an environment where the
+      users don't have direct access to any data stored on the client (e.g.
+      [cordova](http://cordova.apache.org)) this action can be overridden to
+      simply transition to the `'index'` route.
+
       @method actions.sessionInvalidationSucceeded
     */
     sessionInvalidationSucceeded: function() {
-      window.location.replace(Configuration.applicationRootUrl);
+      if (!Ember.testing) {
+        window.location.replace(Configuration.applicationRootUrl);
+      }
     },
 
     /**

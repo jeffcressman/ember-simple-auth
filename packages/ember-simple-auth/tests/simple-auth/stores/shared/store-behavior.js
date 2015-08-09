@@ -15,11 +15,9 @@ export default function(options) {
       expect(this.store.restore()).to.eql({ key2: 'value2' });
     });
 
-    it('does not trigger the "updated" event', function(done) {
+    it('does not trigger the "sessionDataUpdated" event', function(done) {
       var triggered = false;
-      this.store.one('sessionDataUpdated', function() {
-        triggered = true;
-      });
+      this.store.one('sessionDataUpdated', function() { triggered = true; });
       this.store.persist({ key: 'other value' });
       syncExternalChanges.apply(this);
 
@@ -31,13 +29,13 @@ export default function(options) {
   });
 
   describe('#restore', function() {
-    describe('when the store is empty', function() {
+    context('when the store is empty', function() {
       it('returns an empty object', function() {
         expect(this.store.restore()).to.eql({});
       });
     });
 
-    describe('when the store has data', function() {
+    context('when the store has data', function() {
       beforeEach(function() {
         this.store.persist({ key1: 'value1', key2: 'value2' });
       });

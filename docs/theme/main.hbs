@@ -69,6 +69,11 @@
         top: -55px;
         height: 1px;
       }
+      span.label-deprecation {
+        float: left;
+        line-height: inherit;
+        margin-right: 5px;
+      }
     </style>
   </head>
   <body>
@@ -80,7 +85,7 @@
               <li class="dropdown" id="classesDropdown">
                 <a href="#" class="dropdown-toggle" data-toggle="dropdown"><b class="caret"></b> <span class="caption"></span></a>
                 <ul class="dropdown-menu">
-                  {{#each}}
+                  {{#each .}}
                     <li>
                       <a href="#{{anchor}}">{{name}}</a>
                     </li>
@@ -99,7 +104,7 @@
         <div class="row">
           <div class="alert alert-info">For a general overview of how Ember Simple Auth works, see the <a href="{{@root.project.githubUrl}}#readme" title="Ember Simple Auth's README github" class="alert-link">README</a></div>
         </div>
-        {{#each}}
+        {{#each .}}
           <div class="row">
             <div class="col-md-12">
               <div class="page-header">
@@ -110,6 +115,9 @@
           </div>
           <div class="row">
             <div class="col-md-9" id="main-content">
+              {{#if deprecated}}
+                <span class="label label-warning label-deprecation">deprecated</span>{{markdown deprecationMessage}}
+              {{/if}}
               {{markdown description}}
               <h4 class="section">Importing</h4>
               <dl>
@@ -119,7 +127,7 @@
                 </dd>
                 <dt>Standard AMD<dt>
                 <dd>
-                  <pre><code class="lang-javascript javascript">var {{shortname}} = requireModule('{{module}}').default;</code></pre>
+                  <pre><code class="lang-javascript javascript">var {{shortname}} = requireModule('{{module}}')['default'];</code></pre>
                 </dd>
               </dl>
               {{#if properties}}

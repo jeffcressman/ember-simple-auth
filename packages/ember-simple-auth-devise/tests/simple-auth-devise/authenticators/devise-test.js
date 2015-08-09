@@ -1,4 +1,5 @@
 import Devise from 'simple-auth-devise/authenticators/devise';
+import Configuration from 'simple-auth-devise/configuration';
 
 describe('Devise', function() {
   beforeEach(function() {
@@ -9,36 +10,32 @@ describe('Devise', function() {
   });
 
   describe('initilization', function() {
-    describe('when no global environment object is defined', function() {
-      it('defaults serverTokenEndpoint to "/users/sign_in"', function() {
-        expect(Devise.create().serverTokenEndpoint).to.eq('/users/sign_in');
-      });
+    it('assigns serverTokenEndpoint from the configuration object', function() {
+      Configuration.serverTokenEndpoint = 'serverTokenEndpoint';
 
-      it('defaults resourceName to "user"', function() {
-        expect(Devise.create().resourceName).to.eq('user');
-      });
+      expect(Devise.create().serverTokenEndpoint).to.eq('serverTokenEndpoint');
     });
 
-    describe('when global environment object is defined', function() {
-      beforeEach(function() {
-        window.ENV = window.ENV || {};
-        window.ENV['simple-auth-devise'] = {
-          serverTokenEndpoint: 'serverTokenEndpoint',
-          resourceName:        'resourceName'
-        };
-      });
+    it('assigns resourceName from the configuration object', function() {
+      Configuration.resourceName = 'resourceName';
 
-      it('uses the defined value for serverTokenEndpoint', function() {
-        expect(Devise.create().serverTokenEndpoint).to.eq('serverTokenEndpoint');
-      });
+      expect(Devise.create().resourceName).to.eq('resourceName');
+    });
 
-      it('uses the defined value for cookieExpirationTime', function() {
-        expect(Devise.create().resourceName).to.eq('resourceName');
-      });
+    it('assigns tokenAttributeName from the configuration object', function() {
+      Configuration.tokenAttributeName = 'tokenAttributeName';
 
-      afterEach(function() {
-        delete window.ENV['simple-auth-devise'];
-      });
+      expect(Devise.create().tokenAttributeName).to.eq('tokenAttributeName');
+    });
+
+    it('assigns identificationAttributeName from the configuration object', function() {
+      Configuration.identificationAttributeName = 'identificationAttributeName';
+
+      expect(Devise.create().identificationAttributeName).to.eq('identificationAttributeName');
+    });
+
+    afterEach(function() {
+      Configuration.load({}, {});
     });
   });
 
@@ -51,12 +48,31 @@ describe('Devise', function() {
       ]);
     });
 
-    describe('when the data contains an user_token and user_email', function() {
+    context('when the data contains a token and email', function() {
       it('resolves with the correct data', function(done) {
-        this.authenticator.restore({ "user_token": 'secret token!', "user_email": "user@email.com" }).then(function(content){
-          expect(content).to.eql({ "user_token": "secret token!", "user_email": "user@email.com" });
+        this.authenticator.restore({ "token": 'secret token!', "email": "user@email.com" }).then(function(content){
+          expect(content).to.eql({ "token": "secret token!", "email": "user@email.com" });
           done();
         });
+      });
+    });
+
+    context('when the data contains a custom token and email attribute', function() {
+      beforeEach(function() {
+        Configuration.tokenAttributeName          = 'employee.token';
+        Configuration.identificationAttributeName = 'employee.email';
+        this.authenticator                        = Devise.create();
+      });
+
+      it('resolves with the correct data', function(done) {
+        this.authenticator.restore({ employee: { token: 'secret token!', email: 'user@email.com' } }).then(function(content){
+          expect(content).to.eql({ employee: { token: 'secret token!', email: 'user@email.com' } });
+          done();
+        });
+      });
+
+      afterEach(function() {
+        Configuration.load({}, {});
       });
     });
   });
@@ -82,7 +98,7 @@ describe('Devise', function() {
       });
     });
 
-    describe('when the authentication request is successful', function() {
+    context('when the authentication request is successful', function() {
       beforeEach(function() {
         this.server.respondWith('POST', '/users/sign_in', [
           201,
@@ -100,7 +116,7 @@ describe('Devise', function() {
       });
     });
 
-    describe('when the authentication request fails', function() {
+    context('when the authentication request fails', function() {
       beforeEach(function() {
         this.server.respondWith('POST', '/users/sign_in', [
           400,

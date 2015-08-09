@@ -1,6 +1,5 @@
 import Base from 'simple-auth/authenticators/base';
-import isSecureUrl from 'simple-auth/utils/is-secure-url';
-import getGlobalConfig from 'simple-auth/utils/get-global-config';
+import Configuration from './../configuration';
 
 /**
   Authenticator that conforms to OAuth 2
@@ -24,7 +23,7 @@ export default Base.extend({
     Triggered when the authenticator refreshes the access token (see
     [RFC 6740, section 6](http://tools.ietf.org/html/rfc6749#section-6)).
 
-    @event updated
+    @event sessionDataUpdated
     @param {Object} data The updated session data
   */
 
@@ -32,14 +31,8 @@ export default Base.extend({
     The endpoint on the server the authenticator acquires the access token
     from.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-oauth2'] = {
-      serverTokenEndpoint: '/some/custom/endpoint'
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.OAuth2#serverTokenEndpoint`](#SimpleAuth-Configuration-OAuth2-serverTokenEndpoint).
 
     @property serverTokenEndpoint
     @type String
@@ -51,14 +44,8 @@ export default Base.extend({
     The endpoint on the server the authenticator uses to revoke tokens. Only
     set this if the server actually supports token revokation.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-oauth2'] = {
-      serverTokenRevocationEndpoint: '/some/custom/endpoint'
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.OAuth2#serverTokenRevocationEndpoint`](#SimpleAuth-Configuration-OAuth2-serverTokenRevocationEndpoint).
 
     @property serverTokenRevocationEndpoint
     @type String
@@ -69,14 +56,8 @@ export default Base.extend({
   /**
     Sets whether the authenticator automatically refreshes access tokens.
 
-    This value can be configured via the global environment object:
-
-    ```js
-    window.ENV = window.ENV || {};
-    window.ENV['simple-auth-oauth2'] = {
-      refreshAccessTokens: false
-    }
-    ```
+    This value can be configured via
+    [`SimpleAuth.Configuration.OAuth2#refreshAccessTokens`](#SimpleAuth-Configuration-OAuth2-refreshAccessTokens).
 
     @property refreshAccessTokens
     @type Boolean
@@ -95,10 +76,9 @@ export default Base.extend({
     @private
   */
   init: function() {
-    var globalConfig                   = getGlobalConfig('simple-auth-oauth2');
-    this.serverTokenEndpoint           = globalConfig.serverTokenEndpoint || this.serverTokenEndpoint;
-    this.serverTokenRevocationEndpoint = globalConfig.serverTokenRevocationEndpoint || this.serverTokenRevocationEndpoint;
-    this.refreshAccessTokens           = globalConfig.refreshAccessTokens || this.refreshAccessTokens;
+    this.serverTokenEndpoint           = Configuration.serverTokenEndpoint;
+    this.serverTokenRevocationEndpoint = Configuration.serverTokenRevocationEndpoint;
+    this.refreshAccessTokens           = Configuration.refreshAccessTokens;
   },
 
   /**
@@ -139,12 +119,14 @@ export default Base.extend({
   },
 
   /**
-    Authenticates the session with the specified `credentials`; the credentials
-    are send via a _"POST"_ request to the
+    Authenticates the session with the specified `options`; makes a `POST`
+    request to the
     [`Authenticators.OAuth2#serverTokenEndpoint`](#SimpleAuth-Authenticators-OAuth2-serverTokenEndpoint)
-    and if they are valid the server returns an access token in response (see
-    http://tools.ietf.org/html/rfc6749#section-4.3). __If the credentials are
-    valid and authentication succeeds, a promise that resolves with the
+    with the passed credentials and optional scope and receives the token in
+    response (see http://tools.ietf.org/html/rfc6749#section-4.3).
+
+    __If the credentials are valid (and the optionally requested scope is
+    granted) and thus authentication succeeds, a promise that resolves with the
     server's response is returned__, otherwise a promise that rejects with the
     error is returned.
 
@@ -154,13 +136,20 @@ export default Base.extend({
     [`Authenticators.OAuth2#refreshAccessTokens`](#SimpleAuth-Authenticators-OAuth2-refreshAccessTokens)).
 
     @method authenticate
-    @param {Object} credentials The credentials to authenticate the session with
+    @param {Object} options
+    @param {String} options.identification The resource owner username
+    @param {String} options.password The resource owner password
+    @param {String|Array} [options.scope] The scope of the access request (see [RFC 6749, section 3.3](http://tools.ietf.org/html/rfc6749#section-3.3))
     @return {Ember.RSVP.Promise} A promise that resolves when an access token is successfully acquired from the server and rejects otherwise
   */
-  authenticate: function(credentials) {
+  authenticate: function(options) {
     var _this = this;
     return new Ember.RSVP.Promise(function(resolve, reject) {
-      var data = { grant_type: 'password', username: credentials.identification, password: credentials.password };
+      var data = { grant_type: 'password', username: options.identification, password: options.password };
+      if (!Ember.isEmpty(options.scope)) {
+        var scopesString = Ember.makeArray(options.scope).join(' ');
+        Ember.merge(data, { scope: scopesString });
+      }
       _this.makeRequest(_this.serverTokenEndpoint, data).then(function(response) {
         Ember.run(function() {
           var expiresAt = _this.absolutizeExpirationTime(response.expires_in);
@@ -194,20 +183,21 @@ export default Base.extend({
       resolve();
     }
     return new Ember.RSVP.Promise(function(resolve, reject) {
-      if (!Ember.isEmpty(_this.serverTokenRevocationEndpoint)) {
+      if (Ember.isEmpty(_this.serverTokenRevocationEndpoint)) {
+        success(resolve);
+      } else {
         var requests = [];
         Ember.A(['access_token', 'refresh_token']).forEach(function(tokenType) {
-          if (!Ember.isEmpty(data[tokenType])) {
+          var token = data[tokenType];
+          if (!Ember.isEmpty(token)) {
             requests.push(_this.makeRequest(_this.serverTokenRevocationEndpoint, {
-              token_type_hint: tokenType, token: data[tokenType]
+              token_type_hint: tokenType, token: token
             }));
           }
         });
         Ember.$.when.apply(Ember.$, requests).always(function(responses) {
           success(resolve);
         });
-      } else {
-        success(resolve);
       }
     });
   },
@@ -228,9 +218,6 @@ export default Base.extend({
     @protected
   */
   makeRequest: function(url, data) {
-    if (!isSecureUrl(url)) {
-      Ember.Logger.warn('Credentials are transmitted via an insecure connection - use HTTPS to keep them secure.');
-    }
     return Ember.$.ajax({
       url:         url,
       type:        'POST',

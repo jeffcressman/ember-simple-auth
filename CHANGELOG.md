@@ -1,3 +1,115 @@
+# 0.8.0
+
+* Correctly initialize the session's `content`, see #556.
+
+# 0.8.0-beta.3
+
+* Fixed a bug related to the mechanism for automatic translation of session
+  events to route actions leaking state, see #544.
+* Fixed a bug where non-secure session data would get lost after a reload, see
+  #534.
+* Ember Simple Auth does not explicitly set the container on the session
+  anymore as that's already set by the container itself when creating the
+  object, see #520.
+
+# 0.8.0-beta.2
+
+* Ember Simple Auth now uses the application's `register` and `inject` methods
+  instead of the container's, see #462.
+* A bug in the OAuth 2.0 authorizer was fixed that prevented requests from
+  actually being authorized, see #483.
+* Changed the way the test helpers are loaded to prevent JSHint errors, see
+  #478.
+* Better implementation for detection of changes in the session store, see
+  #469.
+
+# 0.8.0-beta.1
+
+* __[BREAKING]__ The devise package's `identificationAttributeName` property
+  now defaults to `email`, see #456.
+* The secure session data is now stored under the special key `secure`, see
+  #414. This makes sure that the session isn't cleared completely on logout but
+  only the `secure` key instead. This is a __[BREAKING]__ change if you're
+  using a custom authorizer as that must fetch the token etc. from the
+  session's `secure` key now.
+* The cookie session store will now only expire on inactivity - as long as the
+  session is active, the cookie's expiration time will frequently be updated,
+  see #451.
+* The `LoginControllerMixin` and `AuthenticationControllerMixin` mixins are now
+  deprecated. The `invalidateSession` and `authenticateSession` actions in the
+  `ApplicationRouteMixin` mixin have been deprecated as well.
+  `authenticateSession` is replaced by the new `sessionRequiresAuthentication`
+  action, see #467.
+* The `AuthenticatedRouteMixin` mixin will now correctly return upstream
+  `beforeModel` promises, see #464.
+
+# 0.7.3
+
+* __[BREAKING]__ The name of the token attribute used by the devise
+  authenticator and authorizer is now `token` by default, see #394.
+* __[BREAKING]__ The devise authenticator will now send the user's
+  identification for the configured `identificationAttributeName` instead of
+  always using `email`, see #403.
+* The `crossOriginWhitelist` now supports whitelisting all subdomains of a
+  specific domain, see #398.
+* The docs for defining custom authenticators have been improved, see #399.
+* The tests will now run against the newest versions of Ember, Ember.js, jQuery
+  and handlebars.
+* The examples now run with handlebars 2.0.0 and jQuery 2.1.3.
+* The Google+ example has been fixed so that it will always prompt the user for
+  approval, see #412.
+* The template for the API docs was updated so that it works with the newest
+  handlebars version.
+
+# 0.7.2
+
+* The session's `authenticate` method now accepts an arbitrary list of
+  arguments to pass to the authenticator's `authenticate` method which also
+  allows to pass options to torii providers, see #371.
+* With the move away from controllers/views and towards components, the session
+  is now injected into components as well, see #364.
+* The OAuth 2.0 authenticator now handles access scopes, see #363.
+* `ApplicationRouteMixin` will now send actions to the current route if
+  available or the initial transition, see #367.
+* Added a new `currentSession()` helper to the Ember Simple Auth Testing
+  package that provides access to the current session, see #359.
+* Fixed clearing of cookie and `localStorage` stores, see #349.
+* The `ajaxPrefilter` and `ajaxError` handlers were cleaned up.
+
+# 0.7.1
+
+* The `localStorage` session store now correctly reads its configuration from
+  the `Configuration` object and in turn can be configured in
+  `config/environment.js` in Ember CLI projects, see #340.
+
+# 0.7.0
+
+* __[BREAKING]__: The Devise authorizer now sends the session token as
+  `user_token` instead of `token` for consistency.
+* The session store can store nested objects now, see #321.
+* The property names for `user_token` and `user_email` are now configurable for
+  the Devise authenticator/authorizer, see #319.
+* The `ApplicationRouteMixin`'s `sessionInvalidationSucceeded` action will no
+  longer reload the page in testing mode, see #333.
+* The cookie session store now has a `cookieDomain` setting that can be used if
+  e.g. the session needs to be shared across subdomains, see #332.
+* The AMD distribution has been fixed so that it doesn't depend on any specific
+  global objects anymore, see #325, #323.
+* Removed the insecure connection warning as it never actually triggers when it
+  actually should, see #318.
+* The `crossOriginWhitelist` setting can now be set to `['*']` to allow
+  requests to all domains, see #309.
+* The global `ajaxPrefilter` and `ajaxError` hooks will now be setup only once
+  which fixes some problems in testing mode.
+
+# 0.6.7
+
+* The Ember CLI Addons will now use the project's configuration as defined in
+  `config/environment.js` and do not depend on `window.ENV` anymore, see
+  [simplabs/ember-cli-simple-auth#21]https://github.com/simplabs/ember-cli-simple-auth/issues/21.
+* All configuration data is now held in configuration objects for the
+  OAuth 2.0, cookie store and devise extension libraries as well.
+
 # 0.6.6
 
 This release fixes the Ember CLI Addon packages that were (again) published
@@ -159,7 +271,7 @@ incorrectly to npm...
   `setup` method, these values are now defined on `window.ENV['simple-auth']`
   (and `window.ENV['simple-auth-oauth']` etc. for the extension libraries).
   See the
-  [API Docs for `Configuration`](http://ember-simple-auth.simplabs.com/ember-simple-auth-api-docs.html#SimpleAuth-Configuration)
+  [API Docs for `Configuration`](http://ember-simple-auth.com/ember-simple-auth-api-docs.html#SimpleAuth-Configuration)
   for more information.
 * __[BREAKING]__ All underscores have been replaced with dashes in filenames.
   This only affects users that were using the AMD build.
